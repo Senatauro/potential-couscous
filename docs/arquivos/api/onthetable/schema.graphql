@@ -1,0 +1,261 @@
+#Colocar tudo em ingles - OK
+#Pesquisar sobre o auth tabelas 
+#Verificar se é possivel colocar mais de uma pessoa autorizada a mexer com as tabelas
+#Se conseguir a parte do auth, deletar o email, telefone, usuário e senha de campos do usuário, cliente e funcionario
+#Modificar a tabela de uso da mesa para conseguir captar quanto tempo demorou para o pedido ser entrege (diferente do tempo de preparo do dado do produto) - OK
+
+
+type User @model(mutations: {create: null, update: "updateUser", delete: "deleteUser"})
+  @auth(rules: [{ allow: owner },
+                  { allow: owner, ownerField: "owner", operations: [update] }
+  ])
+{
+  id: ID!                   #Gerado automaticamente
+  name: String!
+  cpf: String!              #Unico   #Está como string porque int não aguenta o tamanho
+  phone: String!            #Está como string porque int não aguenta o tamanho #Retirado por conta da autorização
+  #Criar query para procurar usuário por email
+  #email: String!            #Unico #Retirado por conta da autorização
+  birth: AWSDate!           #Formato de data utilizado pelo AWS é AAAA-MM-DD. Utilizando AWSDate pois é necessário guardar somente a data
+  rg:   String!             #RG
+  #conexoes
+  restaurants: [Restaurant] @connection(name:"userRestaurant") #Conexão com a tabela de restaurantes
+  address: Address @connection
+
+  #Definição de ID do dono
+  owner: String
+}
+
+input CreateUserInput {
+	name: String!
+	cpf: String!
+	phone: String!
+	birth: AWSDate!
+  rg:   String!
+	email: String!
+}
+
+
+type Restaurant @model(mutations: {create: null, update: "updateRestaurant", delete: "deleteRestaurant"})
+  @auth(rules: [{ allow: owner },
+                { allow: owner, ownerField: "owner", operations: [update] }
+])
+{
+  id: ID!                   #Gerado automaticamente
+  cnpj: String!             #Unico #Está como string porque int não aguenta o tamanho
+  razao_social: String!     #Nome na justiça
+  name: String!             #Nome Fantasia 
+  phone: String!            #Unico
+  color: String
+  img: String
+  ifood: String
+  ubereats: String
+  site: String
+
+  #conexoes
+  user: User @connection(name:"userRestaurant")
+  employees: [Employee] @connection
+  places: [Place] @connection
+  categories: [Category] @connection
+
+  #Definição de ID do dono
+  owner: String
+}
+
+input CreateRestaurantInput {
+	cnpj: String!
+	razao_social: String!
+	name: String!
+	phone: String!
+  color: String
+  img: String
+	ifood: String
+	ubereats: String
+	site: String
+	restaurantUserId: ID
+  #Não consegui pensar em um identificador bom
+	plazaRestaurantsId: ID
+}
+
+
+
+type Employee @model(mutations: {create: null, update: "updateEmployee", delete: "deleteEmployee"})
+  @auth(rules: [{ allow: owner },
+                  { allow: owner, ownerField: "owner", operations: [update] }
+  ])
+  {
+  id: ID!
+  name: String!
+  #permissões? Melhor fazer com cognito
+  #login: String!        #Unico
+  #pwd: String!
+  title: String!
+
+  #conexoes
+  idRestaurant: Restaurant @connection
+
+  #Definição de ID do dono
+  owner: String
+}
+
+input CreateEmployeeInput {
+	id: ID
+	name: String!
+	login: String!
+	pwd: String!
+	title: String!
+}
+
+
+
+type Place @model{
+  id: ID!
+  name: String!
+
+  #Lista conexões
+  tables: [Table] @connection
+}
+
+type Table @model{
+  id: ID!
+  name: String!
+  qrcode: String!
+
+  #Lista conexões
+  uses: [Use] @connection
+  #Como colocar status? meu deus
+}
+
+type Use @model{
+  id: ID!
+  entry: AWSDateTime!
+  exit: AWSDateTime!
+  numUsers: Int!
+
+  #Lista conexões
+  requests: [Request] @connection
+}
+
+type Request @model{
+  id: ID!
+  amount: Float!
+  #formaDePagamento
+
+  #Lista conexões
+  dishes: [DishRequest] @connection
+  myClients: [Client] @connection
+}
+
+
+#Utilizado para coletar quanto tempo o prato demorou para ser entregue
+type DishRequest @model{
+  id: ID!
+  dish: Dish! @connection
+  timeTook: Int!
+}
+
+type Client @model(mutations: {create: null, update: "updateClient", delete: "deleteClient"}) 
+  @auth(rules: [{ allow: owner },
+                { allow: owner, ownerField: "owner", operations: [create, update] }
+]){
+  id: ID!
+  name: String!
+  cpf: String!      #Unico
+  #phone: String!    #Unico  #Retirado por conta da autorização
+  #email: String!    #Unico  #Retirado por conta da autorização
+  birth: AWSDate
+
+  #Lista conexões
+  address: Address @connection
+
+  #Definição de ID do dono
+  owner: String
+}
+
+input CreateClientInput{
+  name: String!
+  cpf: String!
+  phone: String!
+  email: String!
+  birth: AWSDate
+  owner: String
+}
+
+
+
+
+type Category @model{
+  id: ID!
+  name: String!
+  dishes: [Dish] @connection
+}
+
+type Dish @model{
+  id: ID!
+  name: String!
+  description: String!
+  missing: Boolean!
+  size: Int!
+  timePrepare: Int!
+  cost: Float!
+  img: String!
+}
+
+type Plaza @model{
+  id: ID!
+  name: String!
+
+  #Lista conexões
+  #Endereço
+  restaurants: [Restaurant] @connection
+}
+
+type Plan @model{
+  id: ID!
+  type: Subs! @connection
+  startDate: AWSDateTime!
+  dueDate: AWSDateTime!
+}
+
+type Subs @model{
+  id: ID!
+  numUsers: Int!
+  numRestaurants: Int!
+  alimentacao: Int! #Não lembro o que isso queria dizer
+  cost: Int!
+}
+
+type Address @model{
+  id: ID!
+  coutry: Coutry! @connection
+  state: State! @connection
+  city: City! @connection
+  street: String!
+  cep: String!
+  complemento: String
+  num: Int
+}
+
+type Coutry @model{
+  id: ID!
+  name: String!
+}
+
+type State @model{
+  id: ID!
+  name: String!
+}
+
+type City @model{
+  id: ID!
+  name: String!
+}
+
+
+
+type Mutation{
+  createUser(input: CreateUserInput!): User @function(name: "valorUnicoUsuario-${env}")
+  createRestaurant(input: CreateRestaurantInput!): Restaurant @function(name: "valorUnicoRestaurante-${env}")
+  createEmployee(input: CreateEmployeeInput!): Employee @function(name: "valorUnicoFuncionario-${env}")
+  createClient(input: CreateClientInput!): Client @function(name: "valorUnicoCliente-${env}")
+}
